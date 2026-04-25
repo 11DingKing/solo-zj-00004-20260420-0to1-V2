@@ -60,6 +60,27 @@ class ArticleViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         if self.action == 'list' and not self.request.user.is_staff:
             queryset = queryset.filter(status='published')
+
+        category_id = self.request.query_params.get('category')
+        category_slug = self.request.query_params.get('category_slug')
+        tag_id = self.request.query_params.get('tag')
+        tag_slug = self.request.query_params.get('tag_slug')
+        author_id = self.request.query_params.get('author')
+        status = self.request.query_params.get('status')
+
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+        if category_slug:
+            queryset = queryset.filter(category__slug__iexact=category_slug)
+        if tag_id:
+            queryset = queryset.filter(tags__id=tag_id)
+        if tag_slug:
+            queryset = queryset.filter(tags__slug__iexact=tag_slug)
+        if author_id:
+            queryset = queryset.filter(author_id=author_id)
+        if status:
+            queryset = queryset.filter(status__iexact=status)
+
         return queryset.distinct()
 
     def perform_create(self, serializer):

@@ -18,6 +18,12 @@
 
 	let isAuthor = false;
 
+	async function loadComments() {
+		const articleId = $page.params.id;
+		const commentsData = await api.get('/comments/', { article: articleId });
+		comments = commentsData.results || commentsData;
+	}
+
 	async function loadArticle() {
 		loading = true;
 		error = '';
@@ -30,8 +36,7 @@
 
 			isAuthor = $auth.isAuthenticated && $auth.user?.id === article.author?.id;
 
-			const commentsData = await api.get('/comments/', { article: articleId });
-			comments = commentsData.results || commentsData;
+			await loadComments();
 		} catch (err) {
 			error = '加载文章失败，请刷新重试';
 			console.error('Load error:', err);
@@ -59,21 +64,9 @@
 				commentData.parent = replyTo.id;
 			}
 
-			const savedComment = await api.post('/comments/', commentData);
+			await api.post('/comments/', commentData);
 
-			if (savedComment.is_reply && savedComment.parent) {
-				comments = comments.map(comment => {
-					if (comment.id === savedComment.parent) {
-						return {
-							...comment,
-							replies: [savedComment, ...(comment.replies || [])]
-						};
-					}
-					return comment;
-				});
-			} else {
-				comments = [savedComment, ...comments];
-			}
+			await loadComments();
 
 			newComment = '';
 			replyTo = null;
