@@ -7,23 +7,29 @@
 	let categories = [];
 	let tags = [];
 	let loading = false;
+	let loadingMore = false;
 	let error = '';
 
 	let currentPage = 1;
-	let totalPages = 1;
+	let nextPage = null;
 	let totalCount = 0;
+	let hasMore = false;
 
 	let searchQuery = '';
 	let selectedCategory = null;
 	let selectedTag = null;
 
-	async function loadData() {
-		loading = true;
+	async function loadData(append = false) {
+		if (append) {
+			loadingMore = true;
+		} else {
+			loading = true;
+		}
 		error = '';
 
 		try {
 			const params = {
-				page: currentPage
+				page: append ? nextPage : 1
 			};
 
 			if (searchQuery) {
@@ -36,22 +42,30 @@
 				params.tag = selectedTag;
 			}
 
-			const [articlesData, categoriesData, tagsData] = await Promise.all([
-				api.get('/articles/', params),
-				api.get('/articles/categories/'),
-				api.get('/articles/tags/')
-			]);
+			const articlesData = await api.get('/articles/', params);
 
-			articles = articlesData.results || articlesData;
+			if (append) {
+				articles = [...articles, ...(articlesData.results || articlesData)];
+			} else {
+				articles = articlesData.results || articlesData;
+				const [categoriesData, tagsData] = await Promise.all([
+					api.get('/articles/categories/'),
+					api.get('/articles/tags/')
+				]);
+				categories = categoriesData.results || categoriesData;
+				tags = tagsData.results || tagsData;
+			}
+
 			totalCount = articlesData.count || articles.length;
-			totalPages = Math.ceil(totalCount / 12);
-			categories = categoriesData.results || categoriesData;
-			tags = tagsData.results || tagsData;
+			nextPage = articlesData.next ? currentPage + 1 : null;
+			hasMore = !!articlesData.next;
+			currentPage = append ? currentPage + 1 : 1;
 		} catch (err) {
 			error = '加载数据失败，请刷新重试';
 			console.error('Load error:', err);
 		} finally {
 			loading = false;
+			loadingMore = false;
 		}
 	}
 
@@ -60,27 +74,22 @@
 	});
 
 	function handleSearch() {
-		currentPage = 1;
 		loadData();
 	}
 
 	function handleCategoryChange(categoryId) {
 		selectedCategory = categoryId === '' ? null : parseInt(categoryId);
-		currentPage = 1;
 		loadData();
 	}
 
 	function handleTagChange(tagId) {
 		selectedTag = tagId === '' ? null : parseInt(tagId);
-		currentPage = 1;
 		loadData();
 	}
 
-	function handlePageChange(page) {
-		if (page >= 1 && page <= totalPages) {
-			currentPage = page;
-			loadData();
-			window.scrollTo({ top: 0, behavior: 'smooth' });
+	function loadMore() {
+		if (hasMore && !loadingMore) {
+			loadData(true);
 		}
 	}
 
@@ -88,7 +97,6 @@
 		searchQuery = '';
 		selectedCategory = null;
 		selectedTag = null;
-		currentPage = 1;
 		loadData();
 	}
 
@@ -194,32 +202,14 @@
 			{/each}
 		</div>
 
-		{#if totalPages > 1}
-			<div class="pagination">
+		{#if hasMore || loadingMore}
+			<div class="load-more-section">
 				<button
-					on:click={() => handlePageChange(currentPage - 1)}
-					disabled={currentPage === 1}
-					class="page-btn"
+					on:click={loadMore}
+					disabled={loadingMore || !hasMore}
+					class="btn btn-load-more"
 				>
-					上一页
-				</button>
-				<div class="page-numbers">
-					{#each Array.from({ length: totalPages }, (_, i) => i + 1) as page}
-						<button
-							on:click={() => handlePageChange(page)}
-							class:active={currentPage === page}
-							class="page-num"
-						>
-							{page}
-						</button>
-					{/each}
-				</div>
-				<button
-					on:click={() => handlePageChange(currentPage + 1)}
-					disabled={currentPage === totalPages}
-					class="page-btn"
-				>
-					下一页
+					{loadingMore ? '加载中...' : '加载更多'}
 				</button>
 			</div>
 		{/if}
@@ -437,54 +427,30 @@
 		font-size: 0.75rem;
 	}
 
-	.pagination {
+	.load-more-section {
 		display: flex;
 		justify-content: center;
-		align-items: center;
-		gap: 0.5rem;
 		margin-top: 2rem;
 	}
 
-	.page-btn {
-		padding: 0.5rem 1rem;
+	.btn-load-more {
+		padding: 0.75rem 2rem;
 		background: white;
-		border: 1px solid #bdc3c7;
+		border: 1px solid #3498db;
+		color: #3498db;
 		border-radius: 4px;
 		cursor: pointer;
 		transition: all 0.2s;
+		font-size: 1rem;
 	}
 
-	.page-btn:hover:not(:disabled) {
-		background: #ecf0f1;
-		border-color: #3498db;
-	}
-
-	.page-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.page-numbers {
-		display: flex;
-		gap: 0.25rem;
-	}
-
-	.page-num {
-		padding: 0.5rem 0.75rem;
-		background: white;
-		border: 1px solid #bdc3c7;
-		border-radius: 4px;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.page-num:hover {
-		background: #ecf0f1;
-	}
-
-	.page-num.active {
+	.btn-load-more:hover:not(:disabled) {
 		background: #3498db;
 		color: white;
-		border-color: #3498db;
+	}
+
+	.btn-load-more:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>

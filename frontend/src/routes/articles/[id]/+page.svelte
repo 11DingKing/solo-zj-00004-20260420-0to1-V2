@@ -56,10 +56,10 @@
 			};
 
 			if (replyTo) {
-				`commentData.parent = replyTo.id;
+				commentData.parent = replyTo.id;
 			}
 
-			`const` savedComment = await api.post('/comments/', commentData);
+			const savedComment = await api.post('/comments/', commentData);
 
 			if (savedComment.is_reply && savedComment.parent) {
 				comments = comments.map(comment => {

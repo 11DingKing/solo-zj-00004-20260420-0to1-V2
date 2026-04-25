@@ -6,6 +6,7 @@
 
 	let user = null;
 	let loading = false;
+	let loadingArticles = false;
 	let error = '';
 	let success = '';
 
@@ -13,6 +14,10 @@
 	let bio = '';
 	let email = '';
 	let avatarFile = null;
+
+	let userArticles = [];
+	let articlesPage = 1;
+	let hasMoreArticles = false;
 
 	$: if (!$auth.isAuthenticated) {
 		goto('/login');
@@ -25,10 +30,47 @@
 			nickname = user.nickname || '';
 			bio = user.bio || '';
 			email = user.email || '';
+			loadArticles();
 		} catch (err) {
 			error = '加载个人资料失败';
 		}
 	});
+
+	async function loadArticles(append = false) {
+		if (append) {
+			loadingArticles = true;
+		} else {
+			articlesPage = 1;
+		}
+
+		try {
+			const params = { page: append ? articlesPage + 1 : 1 };
+			const data = await api.get('/articles/my-articles/', params);
+			const articles = data.results || data;
+
+			if (append) {
+				userArticles = [...userArticles, ...articles];
+				articlesPage += 1;
+			} else {
+				userArticles = articles;
+				articlesPage = 1;
+			}
+
+			hasMoreArticles = !!data.next;
+		} catch (err) {
+			console.error('Load articles error:', err);
+		} finally {
+			loadingArticles = false;
+		}
+	}
+
+	function formatDate(dateString) {
+		return new Date(dateString).toLocaleDateString('zh-CN', {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric'
+		});
+	}
 
 	function handleAvatarChange(e) {
 		const file = e.target.files[0];
@@ -151,6 +193,47 @@
 					<span class="label">注册时间：</span>
 					<span class="value">{new Date(user.created_at).toLocaleString('zh-CN')}</span>
 				</div>
+			</div>
+
+			<div class="articles-section">
+				<h3>我的文章 ({userArticles.length})</h3>
+				{#if userArticles.length === 0}
+					<div class="empty-articles">暂无文章</div>
+				{:else}
+					<div class="articles-list">
+						{#each userArticles as article}
+							<div class="article-item" on:click={() => goto(`/articles/${article.id}`)}>
+								{#if article.cover_url}
+									<div class="article-cover-small">
+										<img src={article.cover_url} alt={article.title} />
+									</div>
+								{/if}
+								<div class="article-info">
+									<h4 class="article-title-small">{article.title}</h4>
+									<p class="article-excerpt-small">{article.excerpt}</p>
+									<div class="article-meta-small">
+										<span class="date">{formatDate(article.published_at || article.created_at)}</span>
+										<span class="status {article.status}">{article.status === 'published' ? '已发布' : '草稿'}</span>
+										{#if article.category}
+											<span class="category">{article.category.name}</span>
+										{/if}
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+					{#if hasMoreArticles || loadingArticles}
+						<div class="load-more-section">
+							<button
+								on:click={() => loadArticles(true)}
+								disabled={loadingArticles || !hasMoreArticles}
+								class="btn btn-load-more-small"
+							>
+								{loadingArticles ? '加载中...' : '加载更多'}
+							</button>
+						</div>
+					{/if}
+				{/if}
 			</div>
 		{:else}
 			<div class="loading">加载中...</div>
@@ -329,5 +412,134 @@
 
 	.info-item .value {
 		color: #34495e;
+	}
+
+	.articles-section {
+		margin-top: 2rem;
+		padding-top: 2rem;
+		border-top: 1px solid #ecf0f1;
+	}
+
+	.articles-section h3 {
+		color: #2c3e50;
+		margin-bottom: 1rem;
+	}
+
+	.empty-articles {
+		text-align: center;
+		padding: 2rem;
+		color: #7f8c8d;
+	}
+
+	.articles-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.article-item {
+		display: flex;
+		gap: 1rem;
+		padding: 1rem;
+		background: #f8f9fa;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.article-item:hover {
+		background: #ecf0f1;
+	}
+
+	.article-cover-small {
+		width: 80px;
+		height: 80px;
+		flex-shrink: 0;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.article-cover-small img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.article-info {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.article-title-small {
+		margin: 0 0 0.5rem 0;
+		font-size: 1rem;
+		color: #2c3e50;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.article-excerpt-small {
+		margin: 0 0 0.5rem 0;
+		font-size: 0.85rem;
+		color: #7f8c8d;
+		line-height: 1.5;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+	}
+
+	.article-meta-small {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		font-size: 0.8rem;
+		color: #95a5a6;
+	}
+
+	.article-meta-small .status {
+		padding: 0.125rem 0.5rem;
+		border-radius: 3px;
+		font-size: 0.75rem;
+	}
+
+	.article-meta-small .status.published {
+		background: #d1fae5;
+		color: #065f46;
+	}
+
+	.article-meta-small .status.draft {
+		background: #fef3c7;
+		color: #92400e;
+	}
+
+	.article-meta-small .category {
+		color: #3498db;
+	}
+
+	.load-more-section {
+		display: flex;
+		justify-content: center;
+		margin-top: 1.5rem;
+	}
+
+	.btn-load-more-small {
+		width: auto;
+		padding: 0.5rem 1.5rem;
+		background: white;
+		border: 1px solid #3498db;
+		color: #3498db;
+		font-size: 0.9rem;
+	}
+
+	.btn-load-more-small:hover:not(:disabled) {
+		background: #3498db;
+		color: white;
+	}
+
+	.btn-load-more-small:disabled {
+		opacity: 0.5;
 	}
 </style>
