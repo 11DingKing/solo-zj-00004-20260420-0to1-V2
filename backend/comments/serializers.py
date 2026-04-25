@@ -7,14 +7,18 @@ class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     replies = serializers.SerializerMethodField()
     parent_author = serializers.SerializerMethodField()
+    is_reply = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = [
             'id', 'article', 'author', 'content', 'parent',
-            'parent_author', 'replies', 'created_at', 'updated_at'
+            'parent_author', 'replies', 'created_at', 'updated_at', 'is_reply'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_is_reply(self, obj):
+        return obj.is_reply
 
     def get_replies(self, obj):
         if obj.parent is None:

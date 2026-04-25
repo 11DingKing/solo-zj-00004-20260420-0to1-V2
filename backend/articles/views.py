@@ -60,7 +60,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         if self.action == 'list' and not self.request.user.is_staff:
             queryset = queryset.filter(status='published')
-        return queryset
+        return queryset.distinct()
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)

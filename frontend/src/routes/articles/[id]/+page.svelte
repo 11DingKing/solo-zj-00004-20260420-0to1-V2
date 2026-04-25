@@ -56,11 +56,25 @@
 			};
 
 			if (replyTo) {
-				commentData.parent = replyTo.id;
+				`commentData.parent = replyTo.id;
 			}
 
-			const savedComment = await api.post('/comments/', commentData);
-			comments = [savedComment, ...comments];
+			`const` savedComment = await api.post('/comments/', commentData);
+
+			if (savedComment.is_reply && savedComment.parent) {
+				comments = comments.map(comment => {
+					if (comment.id === savedComment.parent) {
+						return {
+							...comment,
+							replies: [savedComment, ...(comment.replies || [])]
+						};
+					}
+					return comment;
+				});
+			} else {
+				comments = [savedComment, ...comments];
+			}
+
 			newComment = '';
 			replyTo = null;
 		} catch (err) {
