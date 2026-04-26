@@ -86,9 +86,10 @@ class ArticleCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = [
-            'title', 'content', 'cover', 'status',
+            'id', 'title', 'content', 'cover', 'status',
             'category', 'tags'
         ]
+        read_only_fields = ['id']
 
     def create(self, validated_data):
         tags = validated_data.pop('tags', [])
