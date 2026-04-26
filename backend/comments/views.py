@@ -11,11 +11,6 @@ from .permissions import IsAuthorOrReadOnly
 
 
 class CommentViewSet(viewsets.ModelViewSet):
-    queryset = Comment.objects.select_related(
-        'author', 'article', 'parent', 'parent__author'
-    ).prefetch_related(
-        'replies', 'replies__author'
-    ).filter(parent__isnull=True)
     serializer_class = CommentSerializer
     permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -23,24 +18,40 @@ class CommentViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at']
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        if self.action in ['list', 'retrieve']:
+            queryset = Comment.objects.select_related(
+                'author', 'article', 'article__author', 'parent', 'parent__author'
+            ).prefetch_related(
+                'replies', 'replies__author'
+            ).filter(parent__isnull=True)
+        else:
+            queryset = Comment.objects.select_related(
+                'author', 'article', 'article__author', 'parent', 'parent__author'
+            )
+        article_id = self.request.query_params.get('article')
+        if article_id:
+            queryset = queryset.filter(article_id=article_id)
+        return queryset
+
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
-        else:
-            permission_classes = [AllowAny]
-        return [permission() for permission in permission_classes]
+            return [IsAuthenticated(), IsAuthorOrReadOnly()]
+        return [AllowAny()]
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return CommentCreateUpdateSerializer
         return CommentSerializer
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        article_id = self.request.query_params.get('article')
-        if article_id:
-            queryset = queryset.filter(article_id=article_id)
-        return queryset
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.check_object_permissions(request, instance)
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def perform_destroy(self, instance):
+        instance.delete()
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)

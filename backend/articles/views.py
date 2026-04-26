@@ -101,10 +101,10 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 {'detail': '请先登录'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
-        articles = self.queryset.filter(author=request.user)
-        page = self.paginate_queryset(articles)
+        queryset = self.get_queryset().filter(author=request.user)
+        page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = ArticleListSerializer(page, many=True, context={'request': request})
             return self.get_paginated_response(serializer.data)
-        serializer = ArticleListSerializer(articles, many=True, context={'request': request})
+        serializer = ArticleListSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)

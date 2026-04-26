@@ -11,7 +11,6 @@
 	let error = '';
 
 	let currentPage = 1;
-	let nextPage = null;
 	let totalCount = 0;
 	let hasMore = false;
 
@@ -29,7 +28,7 @@
 
 		try {
 			const params = {
-				page: append ? nextPage : 1
+				page: append ? currentPage + 1 : 1
 			};
 
 			if (searchQuery) {
@@ -43,11 +42,12 @@
 			}
 
 			const articlesData = await api.get('/articles/', params);
+			const newArticles = articlesData.results || articlesData;
 
 			if (append) {
-				articles = [...articles, ...(articlesData.results || articlesData)];
+				articles = [...articles, ...newArticles];
 			} else {
-				articles = articlesData.results || articlesData;
+				articles = newArticles;
 				const [categoriesData, tagsData] = await Promise.all([
 					api.get('/articles/categories/'),
 					api.get('/articles/tags/')
@@ -57,7 +57,6 @@
 			}
 
 			totalCount = articlesData.count || articles.length;
-			nextPage = articlesData.next ? currentPage + 1 : null;
 			hasMore = !!articlesData.next;
 			currentPage = append ? currentPage + 1 : 1;
 		} catch (err) {
